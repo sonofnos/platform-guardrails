@@ -1,0 +1,31 @@
+{
+  "name": "platform-guardrails",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Okta-compatible OIDC/RBAC middleware, secrets validation, and an incident alert pipeline",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "jose": "^5.9.6",
+    "express": "^4.21.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.9.0",
+    "typescript": "~5.6.3",
+    "vitest": "^2.1.5",
+    "eslint": "^9.15.0",
+    "@eslint/js": "^9.15.0",
+    "typescript-eslint": "^8.15.0",
+    "globals": "^15.12.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2"
+  }
+}

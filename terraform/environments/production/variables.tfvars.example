@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars, fill in real values, and never commit the copy.
+# All of these come from a secrets manager in CI (see docs/SECRETS.md), not
+# from a checked-in file, even in this "example" form.
+do_token             = ""
+cloudflare_api_token = ""
+cloudflare_zone_id   = ""
+vpc_id               = ""
+ssh_key_fingerprints = []
+allowed_ssh_cidrs    = ["203.0.113.0/24"] # replace with your VPN/bastion CIDR

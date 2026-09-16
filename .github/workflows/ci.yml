@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  app-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: fmt check
+        run: terraform fmt -recursive -check -diff
+
+      - name: init and validate every module
+        run: |
+          set -e
+          for dir in modules/digitalocean-app modules/cloudflare-dns environments/production; do
+            echo "== $dir =="
+            (cd "$dir" && terraform init -backend=false -input=false && terraform validate)
+          done
+
+      # Static security scan of the HCL itself: hardcoded secrets, overly
+      # permissive rules, missing encryption flags. Runs without credentials
+      # and without touching a real account, so it gates every PR.
+      - name: tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: terraform
+
+      - name: gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # `terraform plan` against real infrastructure only runs on the protected
+  # `production` environment, which requires a manual reviewer approval in
+  # GitHub before the job is allowed to start -- the same gate a `terraform
+  # apply` would go through, so a plan that touches real credentials is never
+  # a click a PR author can trigger alone.
+  terraform-plan:
+    needs: terraform
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: terraform/environments/production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_AWS_SECRET_ACCESS_KEY }}
+      - run: terraform plan -input=false
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_AWS_SECRET_ACCESS_KEY }}
+          TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          TF_VAR_vpc_id: ${{ secrets.DO_VPC_ID }}
+          TF_VAR_ssh_key_fingerprints: ${{ secrets.DO_SSH_KEY_FINGERPRINTS }}
+          TF_VAR_allowed_ssh_cidrs: ${{ secrets.ALLOWED_SSH_CIDRS }}
