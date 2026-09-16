@@ -111,6 +111,10 @@ resource "digitalocean_firewall" "app" {
     source_addresses = var.allowed_ssh_cidrs
   }
 
+  # Deliberately public: this is the app's HTTPS listener. tfsec flags any
+  # 0.0.0.0/0 destination/source regardless of intent -- accepted here and
+  # documented in README.md under "Accepted findings", not silenced globally.
+  #tfsec:ignore:digitalocean-compute-no-public-ingress
   inbound_rule {
     protocol         = "tcp"
     port_range       = "443"
@@ -120,15 +124,28 @@ resource "digitalocean_firewall" "app" {
   # No inbound 80 rule: HTTP is redirected to HTTPS at Cloudflare, so the
   # origin never needs to accept it directly. See modules/cloudflare-dns.
 
+  # Egress is scoped to what the app actually needs: HTTPS out (package
+  # registries, upstream APIs, Let's Encrypt/Cloudflare) and DNS resolution.
+  # Everything else outbound is denied by the firewall's implicit default,
+  # unlike the original 1-65535/any-protocol rule this replaced.
+  #tfsec:ignore:digitalocean-compute-no-public-egress
   outbound_rule {
     protocol              = "tcp"
-    port_range            = "1-65535"
+    port_range            = "443"
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 
+  #tfsec:ignore:digitalocean-compute-no-public-egress
   outbound_rule {
     protocol              = "udp"
-    port_range            = "1-65535"
+    port_range            = "53"
+    destination_addresses = ["0.0.0.0/0", "::/0"]
+  }
+
+  #tfsec:ignore:digitalocean-compute-no-public-egress
+  outbound_rule {
+    protocol              = "tcp"
+    port_range            = "53"
     destination_addresses = ["0.0.0.0/0", "::/0"]
   }
 }

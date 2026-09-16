@@ -37,6 +37,23 @@ docs/
   `0.0.0.0/0` outright — the module cannot be applied with SSH open to the
   internet, not "shouldn't be," cannot be.
 
+**Accepted findings (documented `tfsec:ignore`, not a blanket suppression)**
+
+`tfsec` flags any rule with a `0.0.0.0/0`/`::/0` address as critical,
+regardless of port or direction. Four of those are real fixes (see egress,
+above); three are inherent to running a public HTTPS service and are
+ignored inline with a comment at the exact rule, not disabled for the
+module or the repo:
+
+| Finding | Why it's accepted |
+|---|---|
+| Inbound 443 open to the internet | It's the app's public listener. A web server that only accepts HTTPS from a private range isn't a web server. |
+| Outbound 443 to the internet | Package registries, upstream APIs, and Let's Encrypt/Cloudflare all live on the public internet over HTTPS. |
+| Outbound 53 (tcp+udp) to the internet | DNS resolution has no meaningful CIDR to scope to. |
+
+The egress rules that *were* scopeable — the original `1-65535`/any-protocol
+rule this replaced — were tightened rather than ignored.
+
 **CI/CD**
 - `tfsec` and `gitleaks` run on every PR, before any plan touches real
   credentials, so a bad rule or a leaked token fails in a PR check, not in
